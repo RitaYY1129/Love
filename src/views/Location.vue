@@ -282,7 +282,7 @@ const formatTime = (iso) => {
 const loadData = async () => {
   try {
     const history = await LocationAPI.getHistory()
-    historyRecords.value = (history.data || []).slice(0, 50).map(r => ({
+    const allRecords = (history.data || []).slice(0, 50).map(r => ({
       icon: r.icon || '📍',
       name: r.name || r.address || '未知位置',
       time: `${formatTime(r.created_at)}${r.duration ? ' · 停留' + LocationAPI.formatDuration(r.duration) : ''}`,
@@ -290,8 +290,11 @@ const loadData = async () => {
       ownerId: r.owner_id,
       isPartner: r.owner_id !== (authStore.user?.id)
     }))
-    checkinRecords.value = historyRecords.value.filter(r => !r.isPartner).slice(0, 10)
-    if (historyRecords.value[0] && !historyRecords.value[0].isPartner) {
+    // 历史记录只看对方的足迹，这个页面定位是给“看对方”用的
+    historyRecords.value = allRecords.filter(r => r.isPartner)
+    // 我的打卡只保留自己的记录
+    checkinRecords.value = allRecords.filter(r => !r.isPartner).slice(0, 10)
+    if (historyRecords.value[0]) {
       historyRecords.value[0].current = true
     }
     const partner = await LocationAPI.getPartner()
@@ -325,6 +328,46 @@ const reverseGeocode = (lat, lng) => {
     })
 }
 
+// 等待逆地理解析完成后再上报，避免数据库写入'定位中...'或'未知位置'
+async function resolveAndReport(lat, lng) {
+  return new Promise((resolve) => {
+    let resolved = false
+    const finish = (address) => {
+      if (resolved) return
+      resolved = true
+      currentLocation.value.address = address || '地址解析失败'
+      resolve(currentLocation.value.address)
+    }
+    // 优先使用苹果原生地理编码
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.reverseGeocode) {
+      window.webkit.messageHandlers.reverseGeocode.postMessage({ lat, lng })
+      const timer = setInterval(() => {
+        if (currentLocation.value.address && currentLocation.value.address !== '正在定位...' && currentLocation.value.address !== '定位中...') {
+          clearInterval(timer)
+          finish(currentLocation.value.address)
+        }
+      }, 200)
+      setTimeout(() => { clearInterval(timer); finish(currentLocation.value.address) }, 3000)
+      return
+    }
+    // Web 降级
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1&accept-language=zh-CN`)
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.display_name) {
+          const p = data.address || {}
+          const parts = [p.city || p.town || p.county || p.state, p.road || p.suburb || p.neighbourhood, p.name].filter(Boolean)
+          finish(parts.length ? parts.join(' · ') : data.display_name)
+        } else {
+          finish('地址解析失败')
+        }
+      })
+      .catch(() => finish('地址解析失败'))
+  }).then(address => {
+    return LocationAPI.update({ latitude: lat, longitude: lng, address }).then(loadData)
+  })
+}
+
 // iOS 原生回调：由 Capacitor 插件注入，将逆地理结果写回当前位置
 window.onReverseGeocodeResult = (address) => {
   if (currentLocation.value) {
@@ -336,9 +379,8 @@ window.onReverseGeocodeResult = (address) => {
 function onNativeLocationEvent(payload) {
   if (!payload || payload.latitude == null) return
   currentLocation.value = { lat: payload.latitude, lng: payload.longitude, address: '定位中...' }
-  reverseGeocode(payload.latitude, payload.longitude)
-  LocationAPI.update({ latitude: payload.latitude, longitude: payload.longitude, address: currentLocation.value.address })
-    .then(loadData)
+  resolveAndReport(payload.latitude, payload.longitude)
+    .then(() => showToast('位置已同步'))
     .catch(() => {})
 }
 
@@ -433,9 +475,7 @@ const reportLocation = async () => {
     try {
       const pos = await native
       currentLocation.value = { lat: pos.latitude, lng: pos.longitude, address: '定位中...' }
-      reverseGeocode(pos.latitude, pos.longitude)
-      await LocationAPI.update({ latitude: pos.latitude, longitude: pos.longitude, address: currentLocation.value.address })
-      await loadData()
+      await resolveAndReport(pos.latitude, pos.longitude)
       showToast('定位成功并已同步')
     } catch (e) {
       showToast(e?.message || '位置同步失败')
@@ -452,10 +492,8 @@ const reportLocation = async () => {
     async (position) => {
       const { latitude, longitude } = position.coords
       currentLocation.value = { lat: latitude, lng: longitude, address: '定位中...' }
-      reverseGeocode(latitude, longitude)
       try {
-        await LocationAPI.update({ latitude, longitude, address: currentLocation.value.address })
-        await loadData()
+        await resolveAndReport(latitude, longitude)
         showToast('定位成功并已同步')
       } catch (e) {
         showToast(e?.message || '位置同步失败')

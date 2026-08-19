@@ -311,10 +311,62 @@ const fundPayload = () => ({
     transactions: transactions.value,
     accounts: accounts.value
 })
-const persistFund = () => {
+// 合并双方账本：本地记录 + 云端记录按 id 去重合并，避免互相覆盖
+function mergeFundData(local, remote) {
+  if (!remote || typeof remote !== 'object') return local
+  const mergedTx = new Map()
+  for (const arr of [local?.transactions || [], remote?.transactions || []]) {
+    for (const t of arr) {
+      if (!t || !t.id) continue
+      if (!mergedTx.has(t.id)) mergedTx.set(t.id, t)
+    }
+  }
+  const transactions = Array.from(mergedTx.values()).sort((a, b) => {
+    const ta = new Date(a.date).getTime() || 0
+    const tb = new Date(b.date).getTime() || 0
+    return tb - ta
+  })
+  // 账户余额按远程为准；若远程没有则按本地
+  const accounts = Array.isArray(remote.accounts) && remote.accounts.length
+    ? remote.accounts.map(account => ({ ...account, balance: Number(account.balance) || 0 }))
+    : (Array.isArray(local.accounts) && local.accounts.length
+        ? local.accounts.map(account => ({ ...account, balance: Number(account.balance) || 0 }))
+        : [{ id: 'joint', name: '共同基金', icon: '💰', balance: Number(remote.totalAmount ?? local.totalAmount ?? 0) }])
+  // 重新计算总余额（以合并后的 transactions 为准，避免余额与记录对不上）
+  accounts.forEach(acc => { acc.balance = 0 })
+  let myContribution = 0
+  let partnerContribution = 0
+  for (const t of transactions) {
+    const account = accounts.find(a => a.id === (t.accountId || 'joint'))
+    if (account) account.balance += t.type === 'add' ? Number(t.amount) : -Number(t.amount)
+    if (t.type === 'add') myContribution += Number(t.amount)
+    // withdraw 默认从我这边扣；双方贡献这里只记录存入
+  }
+  return {
+    totalAmount: accounts.reduce((sum, a) => sum + a.balance, 0),
+    myContribution,
+    partnerContribution: remote?.partnerContribution ?? local?.partnerContribution ?? partnerContribution,
+    currentGoal: remote?.currentGoal ?? local?.currentGoal ?? null,
+    transactions,
+    accounts
+  }
+}
+
+const persistFund = async () => {
   const payload = fundPayload()
   localStorage.setItem('loveDiary_fund', JSON.stringify(payload))
-  pushSharedState('fund', payload)
+  // 推送前先拉取云端最新，合并后再推送，避免覆盖对方刚记的账
+  try {
+    const shared = await hydrateSharedState('fund', payload)
+    if (shared.enabled && shared.payload && typeof shared.payload === 'object') {
+      const merged = mergeFundData(payload, shared.payload)
+      applyFundData(merged)
+      localStorage.setItem('loveDiary_fund', JSON.stringify(merged))
+      await pushSharedState('fund', merged)
+      return
+    }
+  } catch {}
+  await pushSharedState('fund', payload)
 }
 
 const submitAdd = () => {
@@ -402,7 +454,8 @@ onMounted(async () => {
   applyFundData(localData)
   const shared = await hydrateSharedState('fund', fundPayload())
   if (shared.enabled && shared.payload && typeof shared.payload === 'object') {
-    applyFundData(shared.payload)
+    const merged = mergeFundData(localData, shared.payload)
+    applyFundData(merged)
     localStorage.setItem('loveDiary_fund', JSON.stringify(fundPayload()))
   }
 })
