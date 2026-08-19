@@ -97,28 +97,31 @@ function mapAnniversaryIn(row) {
   }
 }
 
-// 合并情侣共享数据(couple_id)与个人老数据(owner_id)并去重，保证双方看到一致
+// 合并情侣共享数据(couple_id)与个人数据(owner_id)并去重，保证双方看到一致
 async function listAnniversariesMerged(query) {
   const cid = await getMyCoupleId()
   const uid = currentUserId()
   const results = []
+  // 1) 情侣绑定后：取这一对共享的所有纪念日
   if (cid) {
-    // 情侣绑定后：取这一对共享的所有纪念日
-    const byCouple = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), couple_id: cid } })
-    results.push(...(byCouple.data || []))
-    // 兼容老数据：couple_id 为空但仍是我创建的（对方也能看到，避免“有时好有时坏”）
-    const byOwner = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), owner_id: uid, couple_id: 'is.null' } })
-    results.push(...(byOwner.data || []))
-  } else {
-    const byOwner = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), owner_id: uid } })
-    results.push(...(byOwner.data || []))
+    try {
+      const byCouple = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), couple_id: cid } })
+      results.push(...(byCouple.data || []))
+    } catch (e) {}
+  }
+  // 2) 兜底：取本人创建的所有纪念日（无论 couple_id 是否为空/是否匹配，避免“数据库有但页面无”）
+  if (uid) {
+    try {
+      const byOwner = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), owner_id: uid } })
+      results.push(...(byOwner.data || []))
+    } catch (e) {}
   }
   // 去重（同一 id 只保留一份）
   const seen = new Set()
   const deduped = []
   for (const r of results) {
-    if (r.id && seen.has(r.id)) continue
-    if (r.id) seen.add(r.id)
+    if (!r || !r.id || seen.has(r.id)) continue
+    seen.add(r.id)
     deduped.push(r)
   }
   return deduped
@@ -161,23 +164,39 @@ export const AnniversaryAPI = {
     const cid = await getMyCoupleId()
     const uid = currentUserId()
     let candidates = []
+    // 优先：本情侣下被置顶的（含双方创建）—— 需要 couple_id 列存在
     if (cid) {
-      const byCouple = await supabaseRest.get(`anniversaries?select=*&couple_id=eq.${cid}&pin_to_home=eq.true&order=updated_at.desc`, token())
-      if (Array.isArray(byCouple)) candidates.push(...byCouple)
+      try {
+        const byCouple = await supabaseRest.get(`anniversaries?select=*&couple_id=eq.${cid}&pin_to_home=eq.true&order=updated_at.desc`, token())
+        if (Array.isArray(byCouple)) candidates.push(...byCouple)
+      } catch (e) {
+        // couple_id 列尚未迁移时忽略，走下方 owner 兼容逻辑
+      }
     }
     // 兼容老数据：couple_id 为空但仍是我创建的置顶
-    const byOwner = await supabaseRest.get(`anniversaries?select=*&owner_id=eq.${uid}&couple_id=is.null&pin_to_home=eq.true&order=updated_at.desc`, token())
-    if (Array.isArray(byOwner)) candidates.push(...byOwner)
-    if (candidates.length === 0) return null
-    // 取最近更新的一条作为首页置顶，保证双方一致
-    candidates.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-    return mapAnniversaryIn(candidates[0])
+    try {
+      const byOwner = await supabaseRest.get(`anniversaries?select=*&owner_id=eq.${uid}&pin_to_home=eq.true&order=updated_at.desc`, token())
+      if (Array.isArray(byOwner)) candidates.push(...byOwner)
+    } catch (e) {}
+    // 去重后取最近更新的一条作为首页置顶，保证双方一致
+    const seen = new Set()
+    const deduped = []
+    for (const r of candidates) {
+      if (!r || !r.id || seen.has(r.id)) continue
+      seen.add(r.id)
+      deduped.push(r)
+    }
+    if (deduped.length === 0) return null
+    deduped.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+    return mapAnniversaryIn(deduped[0])
   },
   setPinned: async (id) => {
     const cid = await getMyCoupleId()
     if (!cid) throw new Error('尚未绑定情侣')
-    // 同一对情侣只能有一个置顶，先取消其他的
-    await supabaseRest.patch(`anniversaries?couple_id=eq.${cid}&pin_to_home=eq.true`, { pin_to_home: false }, token())
+    // 同一对情侣只能有一个置顶，先取消其他的（couple_id 列缺失时容错）
+    try {
+      await supabaseRest.patch(`anniversaries?couple_id=eq.${cid}&pin_to_home=eq.true`, { pin_to_home: false }, token())
+    } catch (e) {}
     const data = await supabaseRest.patch(`anniversaries?id=eq.${id}&select=*`, { pin_to_home: true }, token())
     return mapAnniversaryIn(Array.isArray(data) ? data[0] : data)
   },

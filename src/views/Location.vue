@@ -182,7 +182,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { LocationAPI } from '@/api'
@@ -342,11 +342,67 @@ function onNativeLocationEvent(payload) {
     .catch(() => {})
 }
 
+// 定时拉取对方最新位置（网页版能做到的最大努力，替代“关App也上报”）
+let partnerPollingTimer = null
+const startPartnerPolling = () => {
+  stopPartnerPolling()
+  partnerPollingTimer = window.setInterval(() => {
+    loadData().catch(() => {})
+  }, 15000)
+}
+const stopPartnerPolling = () => {
+  if (partnerPollingTimer) { clearInterval(partnerPollingTimer); partnerPollingTimer = null }
+}
+
+// 持续共享：开启后台持续上报
+let nativeLocWatcher = null
+let webLocTimer = null
+const onContinuousShareChange = async () => {
+  localStorage.setItem('loveDiary_continuousShare', continuousShare.value ? '1' : '0')
+  if (continuousShare.value) {
+    const native = getNativeLocation()
+    if (native !== null && window.Capacitor?.Plugins?.Location?.start) {
+      try {
+        // 原生后台持续定位：关闭 App 也会继续上报
+        await window.Capacitor.Plugins.Location.start({
+          enableHighAccuracy: true,
+          interval: 30000,
+          distanceFilter: 50
+        })
+        nativeLocWatcher = true
+        showToast('已开启持续位置共享')
+      } catch (e) {
+        showToast('后台定位开启失败，改为网页轮询')
+        startWebShareLoop()
+      }
+    } else {
+      showToast('网页版无法后台定位，已改为每60秒同步')
+      startWebShareLoop()
+    }
+  } else {
+    stopContinuousShare()
+  }
+}
+function startWebShareLoop() {
+  stopContinuousShare()
+  reportLocation()
+  webLocTimer = window.setInterval(reportLocation, 60000)
+}
+function stopContinuousShare() {
+  if (webLocTimer) { clearInterval(webLocTimer); webLocTimer = null }
+  if (nativeLocWatcher && window.Capacitor?.Plugins?.Location?.stop) {
+    window.Capacitor.Plugins.Location.stop().catch(() => {})
+    nativeLocWatcher = null
+  }
+}
+
 // 进入页面即自动定位并显示当前地址名称，不再需要手动登录或点击
 onMounted(async () => {
   await authStore.loadUser()
   loadData()
   reportLocation()
+  // 无论是否开启持续共享，都定时刷新对方位置，保证能看到对方实时位置
+  startPartnerPolling()
   // 恢复之前的持续共享偏好
   continuousShare.value = localStorage.getItem('loveDiary_continuousShare') === '1'
   // 监听原生持续定位事件
@@ -357,7 +413,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  // 离开页面不停止后台共享（用户明确要求关闭App也上报）；仅在网页轮询模式下保留
+  stopPartnerPolling()
+  stopContinuousShare()
 })
 
 // 封装原生定位插件（Capacitor）。不存在则降级为 Web geolocation
@@ -416,44 +473,6 @@ const reportLocation = async () => {
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   )
-}
-
-// 持续共享：开启后台持续上报
-let nativeLocWatcher = null
-let webLocTimer = null
-const onContinuousShareChange = async () => {
-  localStorage.setItem('loveDiary_continuousShare', continuousShare.value ? '1' : '0')
-  if (continuousShare.value) {
-    const native = getNativeLocation()
-    if (native !== null && window.Capacitor?.Plugins?.Location?.start) {
-      try {
-        // 原生后台持续定位：关闭 App 也会继续上报
-        await window.Capacitor.Plugins.Location.start({ intervalMs: 60000 })
-        nativeLocWatcher = true
-        showToast('已开启持续共享（后台也会同步）')
-      } catch {
-        showToast('当前 App 版本未支持后台定位，已改为定时同步')
-        startWebShareLoop()
-      }
-    } else {
-      showToast('网页版无法后台定位，已改为每60秒同步')
-      startWebShareLoop()
-    }
-  } else {
-    stopContinuousShare()
-  }
-}
-function startWebShareLoop() {
-  stopContinuousShare()
-  reportLocation()
-  webLocTimer = window.setInterval(reportLocation, 60000)
-}
-function stopContinuousShare() {
-  if (webLocTimer) { clearInterval(webLocTimer); webLocTimer = null }
-  if (nativeLocWatcher && window.Capacitor?.Plugins?.Location?.stop) {
-    window.Capacitor.Plugins.Location.stop().catch(() => {})
-    nativeLocWatcher = null
-  }
 }
 
 const openMapApp = (app) => {

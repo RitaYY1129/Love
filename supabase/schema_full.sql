@@ -92,7 +92,12 @@ create table if not exists public.anniversaries (
   owner_id uuid references public.profiles(id) on delete cascade,
   couple_id uuid,
   name text not null, date date not null, type text default 'love',
-  created_at timestamptz default now()
+  custom_type text,
+  count_mode text default 'both',
+  repeat_yearly boolean default false,
+  pin_to_home boolean default false,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 create table if not exists public.moods (
   id uuid primary key default gen_random_uuid(),

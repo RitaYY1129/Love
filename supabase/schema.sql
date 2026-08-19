@@ -101,6 +101,7 @@ create table if not exists plans (
 create table if not exists anniversaries (
   id            uuid primary key default gen_random_uuid(),
   owner_id      uuid,
+  couple_id     uuid,                          -- 情侣共用：有值则双方都能看到
   name          text not null,
   date          date not null,
   type          text default 'custom',
