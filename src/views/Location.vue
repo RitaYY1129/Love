@@ -20,73 +20,70 @@
         <div class="card mb-4 map-section">
           <div class="map-container">
             <div class="map-grid"></div>
-            <div class="partner-marker" :style="{ top: '35%', left: '55%' }">
-              <div class="avatar-marker partner">👩</div>
+            <!-- 对方位置：默认居中显示，使用真实经纬度映射到地图 -->
+            <div class="partner-marker" :style="partnerMarkerStyle">
+              <div class="avatar-marker partner">💕</div>
               <div class="marker-pulse"></div>
+              <span class="marker-label">{{ partnerNickname }}·{{ partnerStatus }}</span>
             </div>
-            <div class="my-marker" :style="{ top: '45%', left: '45%' }">
-              <div class="avatar-marker me">👨</div>
-              <div class="marker-pulse"></div>
+            <!-- 我的位置：辅助显示，真实经纬度映射 -->
+            <div class="my-marker" :style="myMarkerStyle">
+              <div class="avatar-marker me">📍</div>
+              <span class="marker-label">{{ myNickname }}·我在这里</span>
             </div>
-            <div class="shared-marker" :style="{ top: '25%', left: '65%' }">
-              <div class="avatar-marker shared">📍</div>
-            </div>
-          </div>
-          
-          <div class="partner-stats">
-            <div class="stat-item">
-              <span class="stat-dot online"></span>
-              <span>她在线</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-dot distance"></span>
-              <span>距离 2.3km</span>
-            </div>
-            <div class="stat-item">
-              <span class="stat-dot checkin"></span>
-              <span>2 次打卡</span>
-            </div>
+            <div class="map-hint" v-if="!partnerLocation">等待 {{ partnerNickname }} 开启定位...</div>
           </div>
 
-          <div class="partner-info">
+          <!-- 对方位置作为重点放在最上面 -->
+          <div class="partner-info highlight" v-if="partnerLocation">
             <div class="avatar-wrapper">
               <div class="partner-avatar">{{ partnerNickname.charAt(0) }}</div>
               <span class="online-dot"></span>
             </div>
             <div class="partner-detail">
-              <div class="partner-name">{{ partnerNickname }}</div>
+              <div class="partner-name">{{ partnerNickname }}的当前位置</div>
               <div class="partner-status">
                 <span class="status-dot"></span>
-                {{ partnerLocation?.address || '暂无位置' }}
+                {{ partnerLocation.address || partnerLocation.name || '未知地点' }}
               </div>
             </div>
             <div class="update-time">{{ partnerStatus }}</div>
+          </div>
+          <div class="partner-info" v-else>
+            <div class="avatar-wrapper">
+              <div class="partner-avatar">{{ partnerNickname.charAt(0) }}</div>
+            </div>
+            <div class="partner-detail">
+              <div class="partner-name">{{ partnerNickname }}还没有位置</div>
+              <div class="partner-status">提醒 TA 打开本页开启定位吧</div>
+            </div>
           </div>
 
           <div class="location-info">
             <div class="location-icon">📍</div>
             <div class="location-detail">
-              <div class="location-name">{{ currentLocation.address }}</div>
+              <div class="location-name">{{ currentLocation.address || '正在获取...' }}</div>
               <div class="location-meta">{{ myNickname }} · 当前位置</div>
             </div>
-            <button class="nav-btn" @click="openNavi">导航</button>
+            <button class="nav-btn" @click="openNavi" v-if="partnerLocation">导航去TA</button>
           </div>
 
           <div class="location-meta-info">
-            <span class="meta-item">📍 点击刷新获取最新位置</span>
+            <span class="meta-item">📍 进入页面自动定位</span>
             <span class="meta-divider">|</span>
-            <span class="meta-item">⏱️ 1.5小时</span>
+            <span class="meta-item">⏱️ {{ partnerStatus }}</span>
           </div>
         </div>
 
+        <!-- 持续共享：开启后后台持续上报（关闭App也同步，需原生插件支持） -->
         <div class="sharing-toggle">
           <div class="toggle-icon">🗺️</div>
           <div class="toggle-content">
-            <div class="toggle-title">位置共享</div>
-            <div class="toggle-desc">共享后对方可看到你的实时位置</div>
+            <div class="toggle-title">持续共享位置</div>
+            <div class="toggle-desc">开启后无论是否停留页面都会持续上报，关闭App也同步（需安装App）</div>
           </div>
           <label class="switch">
-            <input type="checkbox" v-model="locationSharing" @change="toggleSharing" />
+            <input type="checkbox" v-model="continuousShare" @change="onContinuousShareChange" />
             <span class="slider"></span>
           </label>
         </div>
@@ -205,7 +202,7 @@ const tabs = [
 ]
 
 const isPartnerBound = computed(() => authStore.user?.partner !== null)
-const locationSharing = ref(true)
+const continuousShare = ref(false)        // 持续共享（后台/关闭App也上报）
 const isGettingLocation = ref(false)
 const currentLocation = ref({
   lat: 39.9902,
@@ -216,6 +213,27 @@ const showMapSelector = ref(false)
 const partnerLocation = ref(null)
 const historyRecords = ref([])
 const checkinRecords = ref([])
+
+// 把真实经纬度映射到地图百分比位置（以对方为基准居中）
+function toMarkerStyle(targetLat, targetLng) {
+  // 以对方当前位置为地图中心(50%,50%)；我的位置按相对经纬度偏移
+  const refLat = partnerLocation.value?.latitude ?? partnerLocation.value?.lat ?? currentLocation.value.lat
+  const refLng = partnerLocation.value?.longitude ?? partnerLocation.value?.lng ?? currentLocation.value.lng
+  const dLat = (targetLat - refLat) * 120  // 每度约 120% 偏移
+  const dLng = (targetLng - refLng) * 120
+  const top = Math.max(8, Math.min(92, 50 - dLat))
+  const left = Math.max(8, Math.min(92, 50 + dLng))
+  return { top: top + '%', left: left + '%' }
+}
+const partnerMarkerStyle = computed(() => {
+  if (partnerLocation.value?.latitude != null) return toMarkerStyle(partnerLocation.value.latitude, partnerLocation.value.longitude)
+  if (partnerLocation.value?.lat != null) return toMarkerStyle(partnerLocation.value.lat, partnerLocation.value.lng)
+  return { top: '50%', left: '50%' }
+})
+const myMarkerStyle = computed(() => {
+  if (currentLocation.value?.lat != null) return toMarkerStyle(currentLocation.value.lat, currentLocation.value.lng)
+  return { top: '45%', left: '45%' }
+})
 
 const mapApps = ref([
   { name: '高德地图', icon: '🗺️', scheme: 'amap', package: 'com.autonavi.minimap' },
@@ -314,19 +332,65 @@ window.onReverseGeocodeResult = (address) => {
   }
 }
 
+// 原生位置事件回调：持续共享开启后，原生层会不断推送坐标，由前端上报
+function onNativeLocationEvent(payload) {
+  if (!payload || payload.latitude == null) return
+  currentLocation.value = { lat: payload.latitude, lng: payload.longitude, address: '定位中...' }
+  reverseGeocode(payload.latitude, payload.longitude)
+  LocationAPI.update({ latitude: payload.latitude, longitude: payload.longitude, address: currentLocation.value.address })
+    .then(loadData)
+    .catch(() => {})
+}
+
 // 进入页面即自动定位并显示当前地址名称，不再需要手动登录或点击
 onMounted(async () => {
   await authStore.loadUser()
   loadData()
-  getCurrentLocation()
+  reportLocation()
+  // 恢复之前的持续共享偏好
+  continuousShare.value = localStorage.getItem('loveDiary_continuousShare') === '1'
+  // 监听原生持续定位事件
+  if (window.Capacitor?.Plugins?.Location?.addListener) {
+    window.Capacitor.Plugins.Location.addListener('location', onNativeLocationEvent)
+  }
+  if (continuousShare.value) onContinuousShareChange()
 })
 
-const getCurrentLocation = async () => {
+onBeforeUnmount(() => {
+  // 离开页面不停止后台共享（用户明确要求关闭App也上报）；仅在网页轮询模式下保留
+})
+
+// 封装原生定位插件（Capacitor）。不存在则降级为 Web geolocation
+function getNativeLocation() {
+  const cap = window.Capacitor
+  if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Location) {
+    return cap.Plugins.Location.getLocation().then(r => ({ latitude: r.latitude, longitude: r.longitude }))
+  }
+  return null
+}
+
+// 上报一次当前位置到后端（供对方查看）。优先使用原生定位，否则降级 Web
+const reportLocation = async () => {
+  const native = getNativeLocation()
+  if (native !== null) {
+    try {
+      const pos = await native
+      currentLocation.value = { lat: pos.latitude, lng: pos.longitude, address: '定位中...' }
+      reverseGeocode(pos.latitude, pos.longitude)
+      await LocationAPI.update({ latitude: pos.latitude, longitude: pos.longitude, address: currentLocation.value.address })
+      await loadData()
+      showToast('定位成功并已同步')
+    } catch (e) {
+      showToast(e?.message || '位置同步失败')
+    }
+    return
+  }
   if (!navigator.geolocation) {
-    showToast('您的浏览器不支持GPS定位')
+    showToast('当前环境不支持GPS定位')
     return
   }
   isGettingLocation.value = true
+  const finish = () => { isGettingLocation.value = false }
   navigator.geolocation.getCurrentPosition(
     async (position) => {
       const { latitude, longitude } = position.coords
@@ -339,10 +403,10 @@ const getCurrentLocation = async () => {
       } catch (e) {
         showToast(e?.message || '位置同步失败')
       }
-      isGettingLocation.value = false
+      finish()
     },
     (error) => {
-      isGettingLocation.value = false
+      finish()
       switch (error.code) {
         case error.PERMISSION_DENIED: showToast('请在系统设置中开启位置权限'); break
         case error.POSITION_UNAVAILABLE: showToast('无法获取当前位置'); break
@@ -352,6 +416,44 @@ const getCurrentLocation = async () => {
     },
     { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
   )
+}
+
+// 持续共享：开启后台持续上报
+let nativeLocWatcher = null
+let webLocTimer = null
+const onContinuousShareChange = async () => {
+  localStorage.setItem('loveDiary_continuousShare', continuousShare.value ? '1' : '0')
+  if (continuousShare.value) {
+    const native = getNativeLocation()
+    if (native !== null && window.Capacitor?.Plugins?.Location?.start) {
+      try {
+        // 原生后台持续定位：关闭 App 也会继续上报
+        await window.Capacitor.Plugins.Location.start({ intervalMs: 60000 })
+        nativeLocWatcher = true
+        showToast('已开启持续共享（后台也会同步）')
+      } catch {
+        showToast('当前 App 版本未支持后台定位，已改为定时同步')
+        startWebShareLoop()
+      }
+    } else {
+      showToast('网页版无法后台定位，已改为每60秒同步')
+      startWebShareLoop()
+    }
+  } else {
+    stopContinuousShare()
+  }
+}
+function startWebShareLoop() {
+  stopContinuousShare()
+  reportLocation()
+  webLocTimer = window.setInterval(reportLocation, 60000)
+}
+function stopContinuousShare() {
+  if (webLocTimer) { clearInterval(webLocTimer); webLocTimer = null }
+  if (nativeLocWatcher && window.Capacitor?.Plugins?.Location?.stop) {
+    window.Capacitor.Plugins.Location.stop().catch(() => {})
+    nativeLocWatcher = null
+  }
 }
 
 const openMapApp = (app) => {
@@ -390,12 +492,6 @@ const openNavi = () => {
   if (!partnerLocation.value) return showToast('暂无对方位置')
   showMapSelector.value = true
 }
-
-onMounted(async () => {
-  await authStore.loadUser()
-  loadData()
-  getCurrentLocation()
-})
 </script>
 
 <style scoped>

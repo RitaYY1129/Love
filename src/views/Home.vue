@@ -642,18 +642,31 @@ onMounted(async () => {
   wishes.value = readLocal('loveDiary_bucketList')
   if (!wishes.value.length) wishes.value = readLocal('loveDiary_wishes')
 
+  // 先把本人老纪念日补上 couple_id，保证双方共享一致（修复“时好时坏”）
+  try { await AnniversaryAPI.migrateOwnerData() } catch { /* 忽略迁移失败，不影响展示 */ }
+
+  // 纪念日加载加一次重试，避免单次网络抖动导致显示默认
+  async function loadAnniversariesWithRetry() {
+    try {
+      const [listRes, pinned] = await Promise.all([AnniversaryAPI.list(), AnniversaryAPI.getPinned()])
+      anniversaries.value = listRes?.data || []
+      pinnedAnniversary.value = pinned || null
+    } catch {
+      const [listRes, pinned] = await Promise.all([AnniversaryAPI.list(), AnniversaryAPI.getPinned()])
+      anniversaries.value = listRes?.data || []
+      pinnedAnniversary.value = pinned || null
+    }
+  }
+
   const tasks = [
     diaryStore.list?.(),
-    AnniversaryAPI.list(),
-    PlanAPI.list(),
-    AnniversaryAPI.getPinned()
+    loadAnniversariesWithRetry(),
+    PlanAPI.list()
   ]
 
   const results = await Promise.allSettled(tasks)
   if (results[0]?.status === 'fulfilled') { /* diaryStore 结果无需赋值 */ }
-  if (results[1]?.status === 'fulfilled') anniversaries.value = results[1].value?.data || []
   if (results[2]?.status === 'fulfilled') plans.value = results[2].value?.data || []
-  if (results[3]?.status === 'fulfilled') pinnedAnniversary.value = results[3].value || null
 })
 
 onBeforeUnmount(() => {

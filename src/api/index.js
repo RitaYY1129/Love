@@ -97,22 +97,37 @@ function mapAnniversaryIn(row) {
   }
 }
 
+// 合并情侣共享数据(couple_id)与个人老数据(owner_id)并去重，保证双方看到一致
+async function listAnniversariesMerged(query) {
+  const cid = await getMyCoupleId()
+  const uid = currentUserId()
+  const results = []
+  if (cid) {
+    // 情侣绑定后：取这一对共享的所有纪念日
+    const byCouple = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), couple_id: cid } })
+    results.push(...(byCouple.data || []))
+    // 兼容老数据：couple_id 为空但仍是我创建的（对方也能看到，避免“有时好有时坏”）
+    const byOwner = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), owner_id: uid, couple_id: 'is.null' } })
+    results.push(...(byOwner.data || []))
+  } else {
+    const byOwner = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), owner_id: uid } })
+    results.push(...(byOwner.data || []))
+  }
+  // 去重（同一 id 只保留一份）
+  const seen = new Set()
+  const deduped = []
+  for (const r of results) {
+    if (r.id && seen.has(r.id)) continue
+    if (r.id) seen.add(r.id)
+    deduped.push(r)
+  }
+  return deduped
+}
+
 export const AnniversaryAPI = {
   list: async (query = {}) => {
-    const cid = await getMyCoupleId()
-    const uid = currentUserId()
-    let res
-    if (cid) {
-      // 情侣绑定后优先按 couple_id 共享，双方都能看到
-      res = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), couple_id: cid } })
-      // 兼容旧数据：若 couple_id 为空，则按 owner_id 查自己的
-      if (!res.data || res.data.length === 0) {
-        res = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), owner_id: uid } })
-      }
-    } else {
-      res = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), owner_id: uid } })
-    }
-    return { data: (res.data || []).map(mapAnniversaryIn) }
+    const data = await listAnniversariesMerged(query)
+    return { data: data.map(mapAnniversaryIn) }
   },
   get: async (id) => {
     const data = await supabaseRest.get(`anniversaries?select=*&id=eq.${id}`, token())
@@ -132,16 +147,31 @@ export const AnniversaryAPI = {
     await supabaseRest.delete(`anniversaries?id=eq.${id}`, token())
     return { success: true }
   },
+  // 把本人创建但缺 couple_id 的老数据补上当前 couple_id，保证双方共享一致
+  migrateOwnerData: async () => {
+    const cid = await getMyCoupleId()
+    if (!cid) return
+    const uid = currentUserId()
+    const old = await supabaseRest.get(`anniversaries?select=id&owner_id=eq.${uid}&couple_id=is.null`, token())
+    if (Array.isArray(old) && old.length) {
+      await supabaseRest.patch(`anniversaries?owner_id=eq.${uid}&couple_id=is.null`, { couple_id: cid }, token())
+    }
+  },
   getPinned: async () => {
     const cid = await getMyCoupleId()
     const uid = currentUserId()
+    let candidates = []
     if (cid) {
-      const data = await supabaseRest.get(`anniversaries?select=*&couple_id=eq.${cid}&pin_to_home=eq.true&order=updated_at.desc&limit=1`, token())
-      if (Array.isArray(data) && data[0]) return mapAnniversaryIn(data[0])
+      const byCouple = await supabaseRest.get(`anniversaries?select=*&couple_id=eq.${cid}&pin_to_home=eq.true&order=updated_at.desc`, token())
+      if (Array.isArray(byCouple)) candidates.push(...byCouple)
     }
-    // 兼容旧数据
-    const fallback = await supabaseRest.get(`anniversaries?select=*&owner_id=eq.${uid}&pin_to_home=eq.true&order=updated_at.desc&limit=1`, token())
-    return mapAnniversaryIn(Array.isArray(fallback) && fallback[0] ? fallback[0] : null)
+    // 兼容老数据：couple_id 为空但仍是我创建的置顶
+    const byOwner = await supabaseRest.get(`anniversaries?select=*&owner_id=eq.${uid}&couple_id=is.null&pin_to_home=eq.true&order=updated_at.desc`, token())
+    if (Array.isArray(byOwner)) candidates.push(...byOwner)
+    if (candidates.length === 0) return null
+    // 取最近更新的一条作为首页置顶，保证双方一致
+    candidates.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+    return mapAnniversaryIn(candidates[0])
   },
   setPinned: async (id) => {
     const cid = await getMyCoupleId()
