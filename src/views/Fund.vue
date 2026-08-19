@@ -448,6 +448,25 @@ const applyFundData = data => {
   withdrawAccountId.value = accounts.value[0].id
 }
 
+let syncTimer = null
+const startSyncLoop = () => {
+  stopSyncLoop()
+  syncTimer = window.setInterval(async () => {
+    try {
+      const localData = fundPayload()
+      const shared = await hydrateSharedState('fund', localData)
+      if (shared.enabled && shared.payload && typeof shared.payload === 'object') {
+        const merged = mergeFundData(localData, shared.payload)
+        applyFundData(merged)
+        localStorage.setItem('loveDiary_fund', JSON.stringify(fundPayload()))
+      }
+    } catch {}
+  }, 5000)
+}
+const stopSyncLoop = () => {
+  if (syncTimer) { clearInterval(syncTimer); syncTimer = null }
+}
+
 onMounted(async () => {
   let localData = fundPayload()
   try { localData = JSON.parse(localStorage.getItem('loveDiary_fund') || JSON.stringify(localData)) } catch {}
@@ -458,6 +477,11 @@ onMounted(async () => {
     applyFundData(merged)
     localStorage.setItem('loveDiary_fund', JSON.stringify(fundPayload()))
   }
+  startSyncLoop()
+})
+
+onBeforeUnmount(() => {
+  stopSyncLoop()
 })
 </script>
 
