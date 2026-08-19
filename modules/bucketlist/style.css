@@ -1,0 +1,115 @@
+﻿/* 恋爱清单样式 */
+.bucketlist-progress-card {
+  margin: 0 14px 12px;
+  padding: 20px;
+  background: linear-gradient(135deg, #fce4ec, #f8bbd0);
+  border-radius: 16px;
+  text-align: center;
+}
+.bl-progress-num {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.bl-progress-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.bl-progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.5);
+  margin-top: 10px;
+  overflow: hidden;
+}
+.bl-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--color-primary);
+  transition: width .4s ease;
+}
+.bl-add-btn {
+  margin: 0 14px 12px;
+  border-radius: 14px;
+  padding: 14px;
+  font-size: 15px;
+}
+
+/* 清单卡片列表 */
+.card-list { margin: 12px 0; }
+.card-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--color-white);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--color-gray-100);
+  transition: all .2s ease;
+}
+.card-item.done {
+  background: #f5f5f5;
+  opacity: .6;
+}
+.card-check {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all .2s ease;
+  font-size: 12px;
+}
+.card-check.checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+.card-body { flex: 1; min-width: 0; }
+.card-title {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.card-title.done {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+.card-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+.card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.card-del {
+  background: none; border: none;
+  color: var(--color-danger);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  opacity: .6;
+  transition: opacity .2s ease;
+}
+.card-del:active { opacity: 1; }
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+}
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: block;
+}
+.empty-state small {
+  font-size: 12px;
+  color: var(--text-muted);
+}

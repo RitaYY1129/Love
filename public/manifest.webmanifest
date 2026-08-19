@@ -1,0 +1,35 @@
+{
+  "id": "./",
+  "name": "恋爱日记",
+  "short_name": "恋爱日记",
+  "description": "记录两个人的纪念日、日记、愿望和每一个甜蜜瞬间。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#fff9fb",
+  "theme_color": "#ef6f99",
+  "orientation": "portrait-primary",
+  "categories": ["lifestyle", "social"],
+  "icons": [
+    {
+      "src": "./assets/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

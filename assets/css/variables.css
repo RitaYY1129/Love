@@ -1,0 +1,113 @@
+/* ===========================================\
+  恋爱日记 - 主题变量（用户可自定义）\
+  修改这些变量即可换肤\
+   =========================================== */
+:root{
+  /* 主色调 - 用户可通过设置页修改 */
+  --color-primary:#ff6fa8;
+  --color-primary-light:#ffc2db;
+  --color-primary-dark:#e91e6c;
+  --color-primary-bg:#fff0f6;
+
+  /* 辅助色 */
+  --color-secondary:#9c27b0;
+  --color-success:#4caf50;
+  --color-warning:#ff8f00;
+  --color-danger:#f44336;
+
+  /* 中性色 */
+  --color-white:#ffffff;
+  --color-bg:#f5f5f5;
+  --color-gray-50:#fafafa;
+  --color-gray-100:#f5f5f5;
+  --color-gray-200:#eeeeee;
+  --color-gray-300:#e0e0e0;
+  --color-gray-400:#bdbdbd;
+  --color-gray-500:#9e9e9e;
+  --color-gray-600:#757575;
+  --color-gray-700:#616161;
+  --color-gray-800:#424242;
+  --color-gray-900:#212121;
+
+  /* 文字 */
+  --text-primary:var(--color-gray-800);
+  --text-secondary:var(--color-gray-600);
+  --text-muted:var(--color-gray-400);
+  --text-inverse:var(--color-white);
+
+  /* 圆角 */
+  --radius-xs:4px;
+  --radius-sm:8px;
+  --radius-md:12px;
+  --radius-lg:16px;
+  --radius-xl:24px;
+  --radius-full:9999px;
+
+  /* 阴影 */
+  --shadow-sm:0 2px 8px rgba(0,0,0,.06);
+  --shadow-md:0 4px 16px rgba(0,0,0,.08);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.12);
+
+  /* 间距 */
+  --space-xs:4px;
+  --space-sm:8px;
+  --space-md:12px;
+  --space-lg:16px;
+  --space-xl:24px;
+  --space-2xl:32px;
+
+  /* 字体 */
+  --font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+  --font-size-xs:11px;
+  --font-size-sm:12px;
+  --font-size-md:14px;
+  --font-size-lg:16px;
+  --font-size-xl:20px;
+  --font-size-2xl:28px;
+
+  /* 底部导航 */
+  --tabbar-height:64px;
+}
+
+/* 暗色主题 */
+.theme-dark{
+  --color-bg:#121212;
+  --color-white:#1e1e1e;
+  --color-gray-50:#2a2a2a;
+  --color-gray-100:#333333;
+  --color-gray-800:#e0e0e0;
+  --text-primary:#e0e0e0;
+  --text-secondary:#aaaaaa;
+}
+
+/* 蓝色主题 */
+.theme-blue{
+  --color-primary:#42a5f5;
+  --color-primary-light:#90caf9;
+  --color-primary-dark:#1e88e5;
+  --color-primary-bg:#e3f2fd;
+}
+
+/* 紫色主题 */
+.theme-purple{
+  --color-primary:#ab47bc;
+  --color-primary-light:#ce93d8;
+  --color-primary-dark:#8e24aa;
+  --color-primary-bg:#f3e5f5;
+}
+
+/* 绿色主题 */
+.theme-green{
+  --color-primary:#66bb6a;
+  --color-primary-light:#a5d6a7;
+  --color-primary-dark:#43a047;
+  --color-primary-bg:#e8f5e9;
+}
+
+/* 橙色主题 */
+.theme-orange{
+  --color-primary:#ffa726;
+  --color-primary-light:#ffcc80;
+  --color-primary-dark:#f57c00;
+  --color-primary-bg:#fff3e0;
+}

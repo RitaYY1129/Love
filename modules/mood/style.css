@@ -1,0 +1,99 @@
+﻿/* 心情日记样式 */
+.mood-today-card {
+  margin: 0 14px 12px;
+  padding: 20px 16px;
+  background: linear-gradient(135deg, var(--color-primary-bg), #ffe0ed);
+  border-radius: 18px;
+}
+.mood-today-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  text-align: center;
+}
+.mood-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mood-option-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border: 2px solid var(--color-gray-200);
+  border-radius: 14px;
+  background: var(--color-white);
+  cursor: pointer;
+  transition: all .15s;
+}
+.mood-option-btn:active { transform: scale(.95); }
+.mood-option-btn.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg);
+}
+.mood-opt-icon { font-size: 28px; }
+.mood-opt-label { font-size: 12px; color: var(--text-secondary); }
+.mood-option-btn.selected .mood-opt-label { color: var(--color-primary); font-weight: 500; }
+
+.mood-today-note {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 8px 0;
+}
+.mood-note-input {
+  margin-bottom: 10px;
+}
+.mood-save-btn {
+  border-radius: 12px;
+  padding: 12px;
+}
+
+/* 心情日历 */
+.mood-calendar {
+  margin: 0 14px 12px;
+  background: var(--color-white);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.mood-calendar .calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.mood-calendar .cal-day {
+  text-align: center;
+  padding: 6px 0;
+  font-size: 11px;
+  border-radius: 8px;
+  color: var(--text-primary);
+}
+.mood-calendar .cal-day.has-mood {
+  background: var(--color-primary-bg);
+  font-size: 14px;
+}
+.mood-calendar .cal-day.today {
+  border: 2px solid var(--color-primary);
+  font-weight: 700;
+}
+
+/* 心情历史 */
+.mood-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin: 0 14px 8px;
+}
+.mood-icon-big { font-size: 28px; }
+.mood-note-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  line-height: 1.4;
+}

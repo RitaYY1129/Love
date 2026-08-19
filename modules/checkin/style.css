@@ -1,0 +1,84 @@
+﻿/* 恋爱打卡样式 */
+.checkin-status-card {
+  margin: 0 14px 12px;
+  padding: 24px 16px;
+  background: linear-gradient(135deg, var(--color-primary-bg), #ffe0ed);
+  border-radius: 18px;
+  text-align: center;
+  transition: all .3s;
+}
+.checkin-status-card.checked {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+}
+.checkin-icon { font-size: 40px; margin-bottom: 8px; }
+.checkin-text { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.checkin-sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+.checkin-sub b { color: var(--color-primary); font-size: 18px; }
+
+.checkin-btn {
+  margin: 0 14px;
+  border-radius: 14px;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.checkin-done-msg {
+  margin: 0 14px;
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-success);
+  background: #e8f5e9;
+  border-radius: 14px;
+}
+
+/* 日历 */
+.calendar {
+  margin: 0 14px 12px;
+  background: var(--color-white);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.calendar-header {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-day-name {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+.cal-day {
+  text-align: center;
+  padding: 6px 0;
+  font-size: 12px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: default;
+}
+.cal-day.empty { visibility: hidden; }
+.cal-day.today {
+  background: var(--color-primary-bg);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.cal-day.checked {
+  background: var(--color-success);
+  color: #fff;
+  font-weight: 600;
+}
+.cal-day.today.checked {
+  background: var(--color-success);
+  color: #fff;
+}
