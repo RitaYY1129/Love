@@ -99,7 +99,19 @@ function mapAnniversaryIn(row) {
 
 export const AnniversaryAPI = {
   list: async (query = {}) => {
-    const res = await restApi('anniversaries').list(query)
+    const cid = await getMyCoupleId()
+    const uid = currentUserId()
+    let res
+    if (cid) {
+      // 情侣绑定后优先按 couple_id 共享，双方都能看到
+      res = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), couple_id: cid } })
+      // 兼容旧数据：若 couple_id 为空，则按 owner_id 查自己的
+      if (!res.data || res.data.length === 0) {
+        res = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), owner_id: uid } })
+      }
+    } else {
+      res = await restApi('anniversaries').list({ ...query, eq: { ...(query.eq || {}), owner_id: uid } })
+    }
     return { data: (res.data || []).map(mapAnniversaryIn) }
   },
   get: async (id) => {
@@ -107,11 +119,13 @@ export const AnniversaryAPI = {
     return mapAnniversaryIn(Array.isArray(data) ? data[0] : data)
   },
   create: async (item) => {
-    const data = await supabaseRest.post('anniversaries?select=*', withOwner(mapAnniversaryOut(item)), token())
+    const cid = await getMyCoupleId()
+    const data = await supabaseRest.post('anniversaries?select=*', { ...withOwner(mapAnniversaryOut(item)), couple_id: cid }, token())
     return mapAnniversaryIn(Array.isArray(data) ? data[0] : data)
   },
   update: async (id, item) => {
-    const data = await supabaseRest.patch(`anniversaries?id=eq.${id}&select=*`, mapAnniversaryOut(item), token())
+    const cid = await getMyCoupleId()
+    const data = await supabaseRest.patch(`anniversaries?id=eq.${id}&select=*`, { ...mapAnniversaryOut(item), couple_id: cid }, token())
     return mapAnniversaryIn(Array.isArray(data) ? data[0] : data)
   },
   delete: async (id) => {
@@ -121,12 +135,19 @@ export const AnniversaryAPI = {
   getPinned: async () => {
     const cid = await getMyCoupleId()
     const uid = currentUserId()
-    const data = await supabaseRest.get(`anniversaries?select=*&couple_id=eq.${cid}&pin_to_home=eq.true&order=updated_at.desc&limit=1`, token())
-    return mapAnniversaryIn(Array.isArray(data) && data[0] ? data[0] : null)
+    if (cid) {
+      const data = await supabaseRest.get(`anniversaries?select=*&couple_id=eq.${cid}&pin_to_home=eq.true&order=updated_at.desc&limit=1`, token())
+      if (Array.isArray(data) && data[0]) return mapAnniversaryIn(data[0])
+    }
+    // 兼容旧数据
+    const fallback = await supabaseRest.get(`anniversaries?select=*&owner_id=eq.${uid}&pin_to_home=eq.true&order=updated_at.desc&limit=1`, token())
+    return mapAnniversaryIn(Array.isArray(fallback) && fallback[0] ? fallback[0] : null)
   },
   setPinned: async (id) => {
-    const uid = currentUserId()
-    await supabaseRest.patch(`anniversaries?owner_id=eq.${uid}&pin_to_home=eq.true`, { pin_to_home: false }, token())
+    const cid = await getMyCoupleId()
+    if (!cid) throw new Error('尚未绑定情侣')
+    // 同一对情侣只能有一个置顶，先取消其他的
+    await supabaseRest.patch(`anniversaries?couple_id=eq.${cid}&pin_to_home=eq.true`, { pin_to_home: false }, token())
     const data = await supabaseRest.patch(`anniversaries?id=eq.${id}&select=*`, { pin_to_home: true }, token())
     return mapAnniversaryIn(Array.isArray(data) ? data[0] : data)
   },

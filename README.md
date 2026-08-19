@@ -2,13 +2,15 @@
 
 Android 内测构建说明见 [ANDROID_SETUP.md](./ANDROID_SETUP.md)。
 
-一款为情侣设计的移动端恋爱记录应用，可以记录纪念日、日记、共同账本、愿望、计划、心情、照片和情侣互动。
+一款为情侣设计的移动端恋爱记录应用，可以记录纪念日、日记、共同账本、愿望、计划、照片和情侣互动。
 
 ## 在线使用与手机安装
 
 项目推送到 `main` 分支后，会通过 GitHub Actions 自动部署到 GitHub Pages。
 
-在线地址：<https://ritayy1129.github.io/Love-diary/>
+在线地址：<https://ritayy1129.github.io/Love/>
+
+> 首次部署后若访问 404，请进入仓库 Settings → Pages，将 Build and deployment 的 Source 设置为 GitHub Actions。
 
 ### Android
 
